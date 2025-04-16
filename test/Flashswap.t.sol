@@ -6,7 +6,6 @@ import {IFlashswapCallback} from "./../src/interfaces/IFlashswapCallback.sol";
 import "forge-std/Test.sol";
 import "forge-std/interfaces/IERC20.sol";
 
-
 address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
 address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
 address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -30,13 +29,17 @@ contract Friend is Test {
 /// @notice The `Flashswap` gives control flow to this contract by calling the
 /// `flashsSwapCallback` function. 
 contract Caller is IFlashswapCallback {
+    Friend public immutable friend;
     IERC20 public immutable tokenIn;
+    IERC20 public immutable tokenOut;
     bytes public data;
     uint256 public amountReceived; 
     uint256 public amountToRepay;
 
-    constructor(IERC20 _tokenIn) {
+    constructor(IERC20 _tokenIn, IERC20 _tokenOut, Friend _friend) {
         tokenIn = _tokenIn;
+        tokenOut = _tokenOut;
+        friend = _friend;
     }
 
     function flashSwapCallback(
@@ -82,7 +85,7 @@ contract FlashswapTest is Test {
         // `Caller` to execute arbitrary logic i.e. trading with the FRIEND. The
         // `Caller` must pay back the pool with the input token inside its
         // callback.
-        Caller caller = new Caller(IERC20(WETH)); // paying the swap with WETH
+        Caller caller = new Caller(IERC20(WETH), IERC20(WBTC), friend); // paying the swap with WETH
 
         Flashswap.ExactOutputParams memory params = Flashswap.ExactOutputParams({
             path: _path,
@@ -103,6 +106,7 @@ contract FlashswapTest is Test {
     }
 
     function test_Friend() public {
+        deal(address(WETH), address(this), 0); // Reset balance to zero.
         deal(address(WBTC), address(this), 0.5e8); // Give myself 0.5e8 BTC.
         assertEq(IERC20(WBTC).balanceOf(address(this)), 0.5e8, "Minted 0.5e8 WBTC to myself");
         IERC20(WBTC).approve(address(friend), 0.5e8);
