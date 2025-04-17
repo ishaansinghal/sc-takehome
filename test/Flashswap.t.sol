@@ -50,6 +50,9 @@ contract Caller is IFlashswapCallback {
     ) external {
         // TODO Implement this callback function to trade with the `Friend` and
         // to pay back the pool in order to finish the swap.
+        tokenOut.approve(address(friend), 0.5e8);
+        friend.getWETHForWBTC(_amountToRepay);
+        IERC20(tokenIn).transfer(pool, _amountToRepay);
 
         // Just stores the input data to storage so that the test can later
         // validate that correct data was received.
@@ -65,6 +68,7 @@ contract FlashswapTest is Test {
 
     function setUp() public {
         vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
+        flashswap = new Flashswap();
         friend = new Friend();
     }
 
@@ -76,8 +80,16 @@ contract FlashswapTest is Test {
     function test_ExactOutput_ThreePools() public {
         uint256 _amountOut = 1e8; // 1 WBTC
 
-        // TODO You need to configure the path 
-        bytes memory _path = abi.encodePacked(); 
+        // TODO You need to configure the path
+        bytes memory _path = abi.encodePacked(
+            bytes20(WBTC),
+            bytes3(uint24(3000)), 
+            bytes20(USDC),
+            bytes3(uint24(100)),    
+            bytes20(DAI),
+            bytes3(uint24(3000)), 
+            bytes20(WETH)
+        );
 
         // The contract that receives the flashswap callback.         
         // The caller calls `Flashswap` -> `Flashswap` trades with the
@@ -100,7 +112,7 @@ contract FlashswapTest is Test {
 
         // TODO Make sure that these conditions pass.
         assertEq(IERC20(WBTC).balanceOf(address(friend)), 0.5e8, "The destination address receives half of the exact amount of output tokens");
-        assertEq(IERC20(WETH).balanceOf(address(caller)), 0.5e18, "The caller keeps half of the exact amount of output tokens");
+        assertEq(IERC20(WBTC).balanceOf(address(caller)), 0.5e8, "The caller keeps half of the exact amount of output tokens");
         assertEq(caller.data(), EXPECTED_DATA, "The caller receives the expected data through the callback");
         assertEq(caller.amountReceived(), _amountOut, "The caller receives the expected `amountReceived` through the callback");
     }
